@@ -417,9 +417,9 @@ fn draw_actor(
     assets: &mut Assets,
     ctx: &mut Context,
     actor: &Actor,
-    world_coords: (f32, f32),
+    world_coords: f32, f32),
 ) -> GameResult {
-    let (screen_w, screen_h) = world_coords;
+    let (screen_w, screen_h) = (world_coords);
     let pos = world_to_screen_coords(screen_w, screen_h, actor.pos);
     let image = assets.actor_image(actor);
     let drawparams = graphics::DrawParam::new()

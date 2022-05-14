@@ -685,7 +685,6 @@ impl Mesh {
             let msg = format!("Trying to build mesh with < 3 indices, this is usually due to invalid input to a `Mesh` or MeshBuilder`.  Indices:\n {:#?}", indices);
             return Err(GameError::LyonError(msg));
         }
-
         if indices.len() % 3 != 0 {
             let msg = String::from("Trying to build mesh with an array of indices that is not a multiple of 3, this is usually due to invalid input to a `Mesh` or MeshBuilder`.");
             return Err(GameError::LyonError(msg));

@@ -31,13 +31,21 @@ name = "ggez"
 path = "src/lib.rs"
 
 [features]
-default = ["c_dependencies"]
+default = ["c_dependencies", "include_sdl2"]
 bzip2 = ["zip/bzip2"]
 mp3 = ["rodio/mp3"]
 multithread-image-decoding = ["image/hdr", "image/jpeg_rayon"]
 c_dependencies = ["bzip2", "mp3"]
+include_sdl2 = ["pistoncore-sdl2_window"]
 
 [dependencies]
+piston = "0.35.0"
+piston2d-opengl_graphics = "0.50.0"
+piston2d-graphics = "0.24.0"
+piston2d-touch_visualizer = "0.8.0"
+voronoi = "0.1.4"
+rand = "0.3"
+getopts = "0.2.15"
 bitflags = "1"
 zip = { version = "0.5", default-features = false }
 directories = "3"
@@ -62,6 +70,24 @@ mint = "0.5"
 gilrs = "0.8"
 approx = "0.5"
 bytemuck = "1.7"
+getrandom = { version = "0.2", features = ["js"] }
+chrono = "0.4.19"
+embedded-graphics = { git = "https://github.com/embedded-graphics/embedded-graphics.git" }
+
+embedded-text = { git = "https://github.com/embedded-graphics/embedded-text.git" }
+tinybmp = { git = "https://github.com/embedded-graphics/tinybmp.git" }
+tinytga = { git = "https://github.com/embedded-graphics/tinytga.git" }
+
+[patch.crates-io]
+embedded-graphics = { git = "https://github.com/embedded-graphics/embedded-graphics.git" }
+embedded-graphics-core = { git = "https://github.com/embedded-graphics/embedded-graphics.git" }
+embedded-text = { git = "https://github.com/embedded-graphics/embedded-text.git" }
+tinybmp = { git = "https://github.com/embedded-graphics/tinybmp.git" }
+tinytga = { git = "https://github.com/embedded-graphics/tinytga.git" }
+
+[dependencies.pistoncore-sdl2_window]
+version = "0.47.0"
+optional = true
 
 [dev-dependencies]
 chrono = "0.4"

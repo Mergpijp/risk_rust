@@ -1,30 +1,13 @@
-extern crate piston;
-extern crate opengl_graphics;
-extern crate graphics;
-extern crate touch_visualizer;
- 
-#[cfg(feature = "include_sdl2")]
-extern crate sdl2_window;
- 
-extern crate getopts;
 extern crate voronoi;
 extern crate rand;
 
 use glam::*;
-use touch_visualizer::TouchVisualizer;
-use opengl_graphics::{ GlGraphics, OpenGL };
-use graphics::{ Context as Gcontext, Graphics};
-use piston::window::{ Window, WindowSettings };
-use piston::input::*;
-use piston::event_loop::*;
-#[cfg(feature = "include_sdl2")]
-use sdl2_window::Sdl2Window as AppWindow;
 use voronoi::{voronoi, Point, make_polygons};
 use rand::Rng;
- 
+
 static DEFAULT_WINDOW_HEIGHT: u32 = 1080;
 static DEFAULT_WINDOW_WIDTH:  u32 = 1920;
- 
+
 struct Settings {
     lines_only: bool,
     random_count: usize
@@ -43,14 +26,14 @@ use ggez::graphics::MeshBuilder;
 struct State {
     shapes: Vec<Shape>,
     vor_polys: Vec<Vec<Point>>,
-    mesh: GameResult<ggez::graphics::Mesh>,
+    mesh: ggez::graphics::Mesh,
 }
 
 enum Shape {
     Circle(mint::Point2<f32>, f32),
     Rectangle(ggez::graphics::Rect),
 }
- 
+
 impl State {
     /// Load images and create meshes.
     fn new(ctx: &mut ggez::Context) -> GameResult<State> {
@@ -68,7 +51,7 @@ impl State {
             108.0,
             1536.0,
             864.0,
-        ))); 
+        )));
         for x in 1..countries_row as i64 + 1 {
             for y in 1..countries_col as i64 + 1 {
                 let xx = (x as f32*incr_w) + (192.0/2.0);
@@ -82,30 +65,37 @@ impl State {
                     },
                     6.0,
                 ));
-            } 
+            }
         }
-     
-        
+
+
         let vor_diagram = voronoi(vor_pts, DEFAULT_WINDOW_WIDTH as f64);
         let mut vor_polys = make_polygons(&vor_diagram);
-        
-        let width = 1920f32;
-        let height = 1080f32;
-        let window_mode = WindowMode {
-            width,
-            height,
-            resizable: true,
-            ..Default::default()
-        };
-        ggez::graphics::set_mode(ctx, window_mode);
-        ggez::graphics::set_screen_coordinates(ctx, ggez::graphics::Rect{x: 0.0, y: 0.0, w: width, h: height}).unwrap();        
-        
+
+        // find the dimensions of the diagram
+        // we need this to set the screen coordinates to them later
+        let mut x_min = f64::INFINITY;
+        let mut x_max = f64::NEG_INFINITY;
+        let mut y_min = f64::INFINITY;
+        let mut y_max = f64::NEG_INFINITY;
+        for poly in vor_polys.iter() {
+            for point in poly {
+                x_min = x_min.min(*point.x);
+                x_max = x_max.max(*point.x);
+                y_min = y_min.min(*point.y);
+                y_max = y_max.max(*point.y);
+            }
+        }
+
+        // let the screen-space go from (x_min, y_min) to (x_max, y_max)
+        let dia_width = x_max - x_min;
+        let dia_height = y_max - y_min;
+        let screen_rect = ggez::graphics::Rect{x: x_min as f32, y: y_min as f32, w: dia_width as f32, h: dia_height as f32 };
+        ggez::graphics::set_screen_coordinates(ctx, screen_rect).unwrap();
 
         let mesh = build_mesh(&mut vor_polys, ctx)?;
-        ggez::graphics::draw(ctx, &mesh, ggez::graphics::DrawParam::default())?;
-        ggez::graphics::present(ctx)?;
-        let state = State { shapes: shapes, vor_polys: vor_polys, mesh: Ok(mesh) };
-        
+        let state = State { shapes: shapes, vor_polys: vor_polys, mesh };
+
         // event::run(ctx, event_loop3, state);
         Ok(state)
     }
@@ -113,21 +103,29 @@ impl State {
 pub fn main() -> GameResult {
 
     //let (mut ctx, events_loop) = ggez::ContextBuilder::new("generative_art", "awesome_person")
-    let c = conf::Conf::new();
+    let width = 1920f32;
+    let height = 1080f32;
+    let window_mode = WindowMode {
+        width,
+        height,
+        resizable: true,
+        ..Default::default()
+    };
     let (mut ctx, event_loop2) = ContextBuilder::new("generative_art", "awesome_person")
-        .default_conf(c)
+        .window_mode(window_mode)
         .build()
         .unwrap();
     println!("{}", ggez::graphics::renderer_info(&ctx)?);
-    let state = State::new(&mut ctx).unwrap();
+    let state = State::new(&mut ctx)?;
     event::run(ctx, event_loop2, state)
 }
 
 impl ggez::event::EventHandler<GameError> for State {
-    fn update(&mut self, _ctx: &mut ggez::Context) -> GameResult {
+    fn update(&mut self, ctx: &mut ggez::Context) -> GameResult {
         Ok(())
     }
     fn draw(&mut self, ctx: &mut ggez::Context) -> GameResult {
+        // THIS IS THE DRAW FUNCTION. DRAW CALLS ARE DONE HERE.
         //let rect_s =  first(&self.shapes).unwrap()
         let mut rect_s = ggez::graphics::Rect::new(
             192.0,
@@ -142,6 +140,7 @@ impl ggez::event::EventHandler<GameError> for State {
                 &Shape::Rectangle(rect) => {
                     ggez::graphics::Mesh::new_rectangle(ctx, ggez::graphics::DrawMode::fill(), rect, ggez::graphics::Color::WHITE)?
                 }
+                // circles appear squashed, as the aspect ratio of your screen-space doesn't match the aspect ratio of the window (1:1 vs 16:9)
                 &Shape::Circle(origin, radius) => {
                     ggez::graphics::Mesh::new_circle(ctx, ggez::graphics::DrawMode::fill(), origin, radius, 0.1, ggez::graphics::Color::BLACK)?
                 }
@@ -149,9 +148,9 @@ impl ggez::event::EventHandler<GameError> for State {
             // ...and then draw it.
             ggez::graphics::draw(ctx, &mesh, ggez::graphics::DrawParam::default())?;
         }
-        //ggez::graphics::draw(ctx, &self.mesh, ggez::graphics::DrawParam::default())?;
-        
-        Ok(())
+        // in order to see anything here, we need to call draw and present
+        ggez::graphics::draw(ctx, &self.mesh, ggez::graphics::DrawParam::default())?;
+        ggez::graphics::present(ctx)
     }
 
 }
@@ -164,28 +163,28 @@ fn build_mesh(vor_polys: &mut Vec<Vec<Point>>, ctx: &mut ggez::Context) -> GameR
         if poly.len() > 1 {
             for j in 0..poly.len() {
                 mint.push(
-                    Vec2::new(poly[j].x.into_inner() as f32, poly[j].y.into_inner() as f32),
-                    
+                    Vec2::new(poly[j].x.into_inner() as f32, poly[j].y.into_inner() as f32)
                 );
-                // mint.push(
-                //     Vec2::new(poly[j+1].x.into_inner() as f32, poly[j+1].y.into_inner() as f32)
-                // );
             }
-            // mint.push(
-            //     Vec2::new(poly[0].x.into_inner() as f32, poly[0].y.into_inner() as f32)
-            // );
+            // then, if your polygon points don't wrap around to the first one (which I assume)
+            // you'll have to close the polygon by drawing a line from end to start
+            mint.push(
+                Vec2::new(poly[0].x.into_inner() as f32, poly[0].y.into_inner() as f32)
+            );
         }
         else {
             println!("IN!");
         }
+        // this adds a line with multiple segments to the builder, which is independent from other lines before
+        mb.line(
+            &mint,
+            4.0,
+            ggez::graphics::Color::BLUE,
+        )?;
+        // we need to clear the vec, because we want each polygon to be independent from previous ones
+        mint.clear();
     }
-    
-    mb.polyline(
-        ggez::graphics::DrawMode::stroke(4.0),
-        &mint,
-        ggez::graphics::Color::BLUE,
-    )?;
-    mb.build(ctx)
+    mb.build(ctx)    // CREATE the mesh
 }
 fn first<T>(v: &Vec<T>) -> Option<&T> {
     v.first()
@@ -235,18 +234,18 @@ fn demo<T, const N: usize>(v: Vec<T>) -> [T; N] {
 fn random_point() -> [f64; 2] {
     [rand::thread_rng().gen_range(0., DEFAULT_WINDOW_HEIGHT as f64), rand::thread_rng().gen_range(0., DEFAULT_WINDOW_WIDTH as f64)]
 }
- 
+
 fn random_color() -> [f32; 4] {
     [rand::random::<f32>(), rand::random::<f32>(), rand::random::<f32>(), 1.0]
 }
- 
+
 fn random_voronoi(dots: &mut Vec<[f64;2]>, colors: &mut Vec<[f32;4]>, num: usize) {
     dots.clear();
     colors.clear();
- 
+
     for _ in 0..num {
         dots.push(random_point());
         colors.push(random_color());
     }
 }
- 
+
